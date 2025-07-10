@@ -1,0 +1,76 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+author: "Hari Prasad Ghimire"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading and Preprocessing the Data
+
+```{r load-data}
+activity <- read.csv("activity.csv")
+activity$date <- as.Date(activity$date)
+```
+
+## What is Mean Total Number of Steps Taken Per Day?
+
+```{r steps-per-day}
+library(dplyr)
+daily_steps <- activity %>% group_by(date) %>%
+  summarize(total_steps = sum(steps, na.rm = TRUE))
+hist(daily_steps$total_steps, main="Total Steps per Day", xlab="Steps")
+mean(daily_steps$total_steps, na.rm = TRUE)
+median(daily_steps$total_steps, na.rm = TRUE)
+```
+
+## What is the Average Daily Activity Pattern?
+
+```{r avg-interval}
+interval_avg <- activity %>% group_by(interval) %>%
+  summarize(mean_steps = mean(steps, na.rm = TRUE))
+plot(interval_avg$interval, interval_avg$mean_steps, type="l",
+     main="Average Steps per 5-min Interval", xlab="Interval", ylab="Steps")
+interval_avg[which.max(interval_avg$mean_steps), ]
+```
+
+## Imputing Missing Values
+
+```{r impute}
+sum(is.na(activity$steps))
+
+# Strategy: replace NA with interval mean
+activity_imputed <- activity
+activity_imputed$steps <- ifelse(is.na(activity$steps),
+                                 yes = interval_avg$mean_steps[match(activity$interval, interval_avg$interval)],
+                                 no = activity$steps)
+
+# Histogram after imputation
+imputed_daily <- activity_imputed %>% group_by(date) %>%
+  summarize(total_steps = sum(steps))
+hist(imputed_daily$total_steps, main="Total Steps per Day (Imputed)", xlab="Steps")
+mean(imputed_daily$total_steps)
+median(imputed_daily$total_steps)
+```
+
+## Are There Differences Between Weekdays and Weekends?
+
+```{r weekend}
+activity_imputed$day_type <- ifelse(weekdays(activity_imputed$date) %in% c("Saturday", "Sunday"),
+                                    "weekend", "weekday")
+activity_imputed$day_type <- factor(activity_imputed$day_type)
+
+interval_day <- activity_imputed %>%
+  group_by(interval, day_type) %>%
+  summarize(mean_steps = mean(steps))
+
+library(ggplot2)
+ggplot(interval_day, aes(x = interval, y = mean_steps)) +
+  geom_line() +
+  facet_wrap(~ day_type, ncol = 1) +
+  labs(title = "Weekday vs Weekend Activity Patterns")
+```
